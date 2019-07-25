@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <!-- import CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <style>
+        .list-box{
+            height: 500px;
+            overflow: auto;
+        }
+        .list-item{
+            padding: 5px;
+            font-size: 14px;
+        }
+        .name{
+            display: inline-block;
+            width: 350px;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <video id="video" width="520px" height="300px" controls="controls" autoplay="autoplay"></video>
+    <hr/>
+    <div v-show="false">
+        <p>url: <el-input type='text'  v-model="url"/></p>
+        <p>name: <el-input type='text' v-model="name"/></p>
+        <el-button @click="start" :loading="loading" type="primary">转换</el-button>
+
+        <hr/>
+    </div>
+
+    <el-button  @click="getM3u8Address" :loading="addressLoading" type="primary">抓取视频链接</el-button>
+    <div class="list-box">
+        <div v-for="(item,index) in pageList" :key="index" class="list-item">
+            <el-input style="width: 300px" type='text' :value="item.url" v-show="false"></el-input>
+            <span class="name">亲爱的，热爱的第{{index+1}}集: {{item.linkUrl}}</span>
+            <el-button size="mini"  @click="play(item)" type="primary" icon="el-icon-caret-right">播放</el-button>
+            <el-button size="mini"  @click="" type="primary" icon="el-icon-download">下载</el-button>
+        </div>
+    </div>
+
+</div>
+</body>
+<!-- import Vue before Element -->
+<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<!-- import JavaScript -->
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    vueObj = new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                name: 'test',
+                url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+                message: '',
+                loading: false,
+                host:'http://localhost:3000',
+                pageList:[],
+                pageUrl: 'http://www.5sdy.cn/play/139690/0/1.html',
+                m3u8Address: '',
+                addressLoading: false
+            }
+        },
+        created(){
+            this.getAllPages();
+        },
+        mounted(){
+           //this.init();
+            let list = localStorage.getItem('m3u8');
+            if(list){
+                this.pageList = JSON.parse(list);
+            }
+        },
+        methods: {
+            getAllPages(){
+                var count = 41;
+              for(var i = 0 ; i < count ; i++){
+                  this.pageList.push({
+                      url: `http://www.5sdy.cn/play/139690/0/${i}.html`,
+                      linkUrl: ''
+                  });
+              }
+            },
+            play ({linkUrl}) {
+                // var url = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+                var video = document.getElementById('video');
+                if (Hls.isSupported()) {
+                    var hls = new Hls();
+                    hls.loadSource(linkUrl);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                        video.play();
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = linkUrl;
+                    video.addEventListener('loadedmetadata', function () {
+                        video.play();
+                    });
+                }
+            },
+            getM3u8Address(){
+                this.addressLoading = true;
+                let index = 0;
+                this.pageList.forEach((item, index) => {
+                    var ajaxUrl = this.host + '/getM3u8Link?url=' + item.url;
+                    fetch(ajaxUrl).then(res => res.json())
+                        .then(json => {
+                            this.pageList[index].linkUrl = json.message.replace('http://jx.gkykw.cn/dp.php?url=', '');
+                            this.m3u8Address = json.message;
+                            index++;
+                        }).finally(() => {
+                            if(index === 41){
+                                this.addressLoading = false;
+                                localStorage.setItem('m3u8', JSON.stringify(this.pageList))
+                            }
+                    });
+                });
+
+            },
+            start () {
+                var url = this.url;
+                var name = this.name;
+                if (!name || !url) {
+                    alert('链接和名称不能为空');
+                    return;
+                }
+                this.loading = true;
+                this.message = '';
+                var ajaxUrl = this.host + 'run?name=' + name + '&url=' + url;
+                fetch(ajaxUrl).then(res => res.json())
+                    .then(json => {
+                        this.$Message.success({
+							duration: 0,
+							message: json.message,
+							showClose: true
+						});
+                    
+                    }).finally(() => {
+						this.loading = false;
+					});
+            }
+        }
+    })
+</script>
+</html>
